@@ -1,0 +1,19 @@
+server:
+  port: 8080
+  max_clients: 100
+  shared_memory_size: 1048576  # 1MB
+
+clients:
+  - id: 1
+    type: "local"  # or "remote"
+    fmu_path: "/path/to/fmu1.fmu"
+    host: "localhost"  # for remote clients
+    port: 8081        # for remote clients
+    
+connections:
+  - from:
+      client: 1
+      variable: "output1"
+    to:
+      client: 2
+      variable: "input1" 

@@ -1,0 +1,21 @@
+[requires]
+boost/1.81.0
+yaml-cpp/0.7.0
+flatbuffers/2.0.8
+openssl/3.1.0
+msquic/2.1.8
+
+[generators]
+cmake_find_package
+cmake_paths
+
+[options]
+boost:shared=True
+yaml-cpp:shared=False
+flatbuffers:shared=False
+msquic:shared=True
+
+[imports]
+bin, *.dll -> ./bin
+lib, *.dylib* -> ./bin
+lib, *.so* -> ./bin 

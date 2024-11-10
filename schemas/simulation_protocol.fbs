@@ -1,0 +1,41 @@
+namespace SimProtocol;
+
+// FMI 2.0 value types
+union ValueType {
+  Real: double,
+  Integer: int32,
+  Boolean: bool,
+  String: string
+}
+
+table Variable {
+  name: string;
+  value: ValueType;
+  valueReference: uint32;
+}
+
+table StepRequest {
+  timestep_us: uint64;  // Microseconds
+  inputs: [Variable];   // New input values
+}
+
+table StepResponse {
+  outputs: [Variable];  // Only changed outputs
+}
+
+table SimulationError {
+  error_code: int32;
+  message: string;
+}
+
+union MessageType {
+  StepRequest,
+  StepResponse,
+  SimulationError
+}
+
+table Message {
+  message: MessageType;
+}
+
+root_type Message; 
