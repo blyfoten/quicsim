@@ -1,17 +1,20 @@
 namespace SimProtocol;
 
-// FMI 2.0 value types
-union ValueType {
-  Real: double,
-  Integer: int32,
-  Boolean: bool,
-  String: string
+enum ValueType : byte {
+  Real = 0,
+  Integer,
+  Boolean,
+  String
 }
 
 table Variable {
   name: string;
-  value: ValueType;
-  valueReference: uint32;
+  value_type: ValueType;
+  value_reference: uint32;
+  real_value: double = 0.0;
+  integer_value: int32 = 0;
+  boolean_value: bool = false;
+  string_value: string;
 }
 
 table StepRequest {
@@ -35,7 +38,8 @@ union MessageType {
 }
 
 table Message {
-  message: MessageType;
+  message_type: MessageType;
+
 }
 
 root_type Message; 

@@ -8,9 +8,9 @@ HQUIC QuicConnection::Registration = nullptr;
 bool QuicConnection::InitializeMsQuic() {
     if (MsQuic != nullptr) return true;
 
-    QUIC_STATUS status = MsQuicOpen(&MsQuic);
+    QUIC_STATUS status = MsQuicOpen2(&MsQuic);
     if (QUIC_FAILED(status)) {
-        std::cerr << "MsQuicOpen failed with status: " << status << std::endl;
+        std::cerr << "MsQuicOpen2 failed with status: " << status << std::endl;
         return false;
     }
 
@@ -38,11 +38,25 @@ QuicConnection::QuicConnection(bool is_server)
     , is_server_(is_server) {
     
     if (!InitializeMsQuic()) {
-        throw std::runtime_error("Failed to initialize MsQuic");
+        throw std::runtime_error("Failed to initialize MSQUIC");
     }
 
-    context_->connected = false;
-    context_->recv_buffer.resize(65535);
+    QUIC_SETTINGS Settings = {0};
+    Settings.IdleTimeoutMs = 5000;
+    Settings.IsSet.IdleTimeoutMs = TRUE;
+
+    QUIC_STATUS status = MsQuic->ConfigurationOpen(
+        Registration,
+        nullptr, 0,  // No ALPN needed for our use case
+        &Settings,
+        sizeof(Settings),
+        nullptr,
+        &configuration_
+    );
+
+    if (QUIC_FAILED(status)) {
+        throw std::runtime_error("Failed to open configuration");
+    }
 }
 
 QuicConnection::~QuicConnection() {
@@ -64,7 +78,11 @@ QUIC_STATUS QuicConnection::ConnectionCallback(
             break;
             
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
-            conn_context->connected = false;
+            // Handle shutdown
+            break;
+            
+        case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
+            // Handle complete shutdown
             break;
     }
     
@@ -87,106 +105,140 @@ QUIC_STATUS QuicConnection::StreamCallback(
                 );
             }
             break;
+            
+        case QUIC_STREAM_EVENT_SEND_COMPLETE:
+            // Handle send complete
+            break;
     }
     
     return QUIC_STATUS_SUCCESS;
 }
 
 bool QuicConnection::connect(const std::string& host, uint16_t port) {
-    QUIC_SETTINGS Settings = {0};
-    Settings.IsSet.IdleTimeoutMs = 1;
-    Settings.IdleTimeoutMs = 5000;
+    if (is_server_) return false;
 
-    QUIC_STATUS status = MsQuic->ConfigurationOpen(
-        Registration,
-        nullptr, 0,
-        &Settings,
-        sizeof(Settings),
-        nullptr,
-        &configuration_);
-
-    if (QUIC_FAILED(status)) return false;
-
-    status = MsQuic->ConnectionOpen(
+    QUIC_STATUS status = MsQuic->ConnectionOpen(
         Registration,
         ConnectionCallback,
         context_.get(),
-        &connection_);
+        &connection_
+    );
 
-    if (QUIC_FAILED(status)) return false;
-
-    QUIC_ADDR address = {0};
-    QuicAddrSetFamily(&address, QUIC_ADDRESS_FAMILY_INET);
-    QuicAddrSetPort(&address, port);
+    if (QUIC_FAILED(status)) {
+        std::cerr << "ConnectionOpen failed with status: " << status << std::endl;
+        return false;
+    }
 
     status = MsQuic->ConnectionStart(
         connection_,
         configuration_,
-        QUIC_ADDRESS_FAMILY_INET,
+        QUIC_ADDRESS_FAMILY_UNSPEC,
         host.c_str(),
-        port);
+        port
+    );
 
-    if (QUIC_FAILED(status)) return false;
+    if (QUIC_FAILED(status)) {
+        std::cerr << "ConnectionStart failed with status: " << status << std::endl;
+        return false;
+    }
 
-    status = MsQuic->StreamOpen(
-        connection_,
-        QUIC_STREAM_OPEN_FLAG_NONE,
-        StreamCallback,
-        context_.get(),
-        &stream_);
-
-    return !QUIC_FAILED(status);
+    return true;
 }
 
 bool QuicConnection::listen(uint16_t port) {
-    QUIC_SETTINGS Settings = {0};
-    Settings.IsSet.IdleTimeoutMs = 1;
-    Settings.IdleTimeoutMs = 5000;
+    if (!is_server_) return false;
 
-    QUIC_STATUS status = MsQuic->ConfigurationOpen(
+    QUIC_ADDR addr = {0};
+    QuicAddrSetPort(&addr, port);
+
+    auto ListenerCallback = [](
+        HQUIC Listener,
+        void* Context,
+        QUIC_LISTENER_EVENT* Event
+    ) -> QUIC_STATUS {
+        auto conn_context = static_cast<ConnectionContext*>(Context);
+        
+        if (Event->Type == QUIC_LISTENER_EVENT_NEW_CONNECTION) {
+            return ConnectionCallback(
+                Event->NEW_CONNECTION.Connection,
+                Context,
+                nullptr
+            );
+        }
+        return QUIC_STATUS_SUCCESS;
+    };
+
+    QUIC_STATUS status = MsQuic->ListenerOpen(
         Registration,
-        nullptr, 0,
-        &Settings,
-        sizeof(Settings),
-        nullptr,
-        &configuration_);
-
-    if (QUIC_FAILED(status)) return false;
-
-    QUIC_ADDR address = {0};
-    QuicAddrSetFamily(&address, QUIC_ADDRESS_FAMILY_INET);
-    QuicAddrSetPort(&address, port);
-
-    status = MsQuic->ListenerOpen(
-        Registration,
-        ConnectionCallback,
+        ListenerCallback,
         context_.get(),
-        &connection_);
+        &connection_
+    );
 
-    if (QUIC_FAILED(status)) return false;
+    if (QUIC_FAILED(status)) {
+        std::cerr << "ListenerOpen failed with status: " << status << std::endl;
+        return false;
+    }
 
+    QUIC_BUFFER alpn = { sizeof("simulation") - 1, (uint8_t*)"simulation" };
     status = MsQuic->ListenerStart(
         connection_,
-        &address);
+        &alpn,
+        1,
+        &addr
+    );
 
-    return !QUIC_FAILED(status);
+    if (QUIC_FAILED(status)) {
+        std::cerr << "ListenerStart failed with status: " << status << std::endl;
+        return false;
+    }
+
+    return true;
 }
 
 bool QuicConnection::send(const uint8_t* data, size_t len) {
-    if (!stream_ || !context_->connected) return false;
+    if (!connection_ || !context_->connected) return false;
 
-    QUIC_BUFFER buffer;
-    buffer.Buffer = const_cast<uint8_t*>(data);
-    buffer.Length = static_cast<uint32_t>(len);
+    if (!stream_) {
+        QUIC_STATUS status = MsQuic->StreamOpen(
+            connection_,
+            QUIC_STREAM_OPEN_FLAG_NONE,
+            StreamCallback,
+            context_.get(),
+            &stream_
+        );
+
+        if (QUIC_FAILED(status)) {
+            std::cerr << "StreamOpen failed with status: " << status << std::endl;
+            return false;
+        }
+
+        status = MsQuic->StreamStart(stream_, QUIC_STREAM_START_FLAG_NONE);
+        if (QUIC_FAILED(status)) {
+            std::cerr << "StreamStart failed with status: " << status << std::endl;
+            return false;
+        }
+    }
+
+    QUIC_BUFFER buffer = {
+        static_cast<uint32_t>(len),
+        const_cast<uint8_t*>(data)
+    };
 
     QUIC_STATUS status = MsQuic->StreamSend(
         stream_,
         &buffer,
         1,
         QUIC_SEND_FLAG_NONE,
-        nullptr);
+        nullptr
+    );
 
-    return !QUIC_FAILED(status);
+    if (QUIC_FAILED(status)) {
+        std::cerr << "StreamSend failed with status: " << status << std::endl;
+        return false;
+    }
+
+    return true;
 }
 
 void QuicConnection::set_message_handler(MessageHandler handler) {
@@ -194,5 +246,5 @@ void QuicConnection::set_message_handler(MessageHandler handler) {
 }
 
 void QuicConnection::poll() {
-    // MsQuic is event-driven, no need for explicit polling
+    // MSQUIC is event-driven, no need for explicit polling
 } 

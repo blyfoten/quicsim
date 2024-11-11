@@ -90,9 +90,9 @@ void QuicServer::prepare_simulation() {
 void QuicServer::handle_client_message(uint32_t client_id, const uint8_t* data, size_t len) {
     auto msg = flatbuffers::GetRoot<SimProtocol::Message>(data);
     
-    if (msg->message_type() == SimProtocol::MessageType_StepResponse) {
-        auto response = msg->message_as_StepResponse();
+    if (msg->message_type_type() == SimProtocol::MessageType_StepResponse) {
+        auto response = msg->message_type_as_StepResponse();
         // Process response and update connected clients
         // TODO: Implement response handling
     }
-} 
+}

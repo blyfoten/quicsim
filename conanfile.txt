@@ -1,21 +1,22 @@
 [requires]
 boost/1.81.0
-yaml-cpp/0.7.0
+yaml-cpp/0.8.0
 flatbuffers/2.0.8
 openssl/3.1.0
-msquic/2.1.8
+libcosim/0.10.3@osp/stable
 
 [generators]
-cmake_find_package
-cmake_paths
+CMakeDeps
+CMakeToolchain
+
+[layout]
+cmake_layout
 
 [options]
-boost:shared=True
-yaml-cpp:shared=False
-flatbuffers:shared=False
-msquic:shared=True
+boost/*:shared=True
+yaml-cpp/*:shared=False
+flatbuffers/*:shared=False
+flatbuffers/*:flatc=True
 
-[imports]
-bin, *.dll -> ./bin
-lib, *.dylib* -> ./bin
-lib, *.so* -> ./bin 
+[tool_requires]
+cmake/3.22.6

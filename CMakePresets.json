@@ -1,0 +1,48 @@
+{
+    "version": 3,
+    "vendor": {
+        "conan": {}
+    },
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 15,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "conan-release",
+            "displayName": "'conan-release' config",
+            "description": "'conan-release' configure using 'Unix Makefiles' generator",
+            "generator": "Unix Makefiles",
+            "cacheVariables": {
+                "CMAKE_POLICY_DEFAULT_CMP0091": "NEW",
+                "CMAKE_BUILD_TYPE": "Release"
+            },
+            "environment": {
+                "PATH": "/home/vscode/.conan2/p/cmake5a09891eb5f57/p/bin:$penv{PATH}"
+            },
+            "cmakeExecutable": "/home/vscode/.conan2/p/cmake5a09891eb5f57/p/bin/cmake",
+            "toolchainFile": "generators/conan_toolchain.cmake",
+            "binaryDir": "/workspaces/slicsim/build/build/Release"
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "conan-release",
+            "configurePreset": "conan-release",
+            "jobs": 8
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "conan-release",
+            "configurePreset": "conan-release",
+            "environment": {
+                "LD_LIBRARY_PATH": "/home/vscode/.conan2/p/b/libco85024bdd76b09/p/lib:/home/vscode/.conan2/p/b/fmili37057a491bd20/p/lib:/home/vscode/.conan2/p/b/libzif057ed843f53a/p/lib:/home/vscode/.conan2/p/xz_ut2397d8b52e1b6/p/lib:/home/vscode/.conan2/p/zstd95f2e30beec43/p/lib:/home/vscode/.conan2/p/b/boost98d47bd5534bf/p/lib:/home/vscode/.conan2/p/xerce835a4b79d55f7/p/lib:$penv{LD_LIBRARY_PATH}",
+                "DYLD_LIBRARY_PATH": "/home/vscode/.conan2/p/b/libco85024bdd76b09/p/lib:/home/vscode/.conan2/p/b/fmili37057a491bd20/p/lib:/home/vscode/.conan2/p/b/libzif057ed843f53a/p/lib:/home/vscode/.conan2/p/xz_ut2397d8b52e1b6/p/lib:/home/vscode/.conan2/p/zstd95f2e30beec43/p/lib:/home/vscode/.conan2/p/b/boost98d47bd5534bf/p/lib:/home/vscode/.conan2/p/xerce835a4b79d55f7/p/lib:$penv{DYLD_LIBRARY_PATH}",
+                "PATH": "/home/vscode/.conan2/p/b/libzif057ed843f53a/p/bin:/home/vscode/.conan2/p/xz_ut2397d8b52e1b6/p/bin:/home/vscode/.conan2/p/zstd95f2e30beec43/p/bin:$penv{PATH}",
+                "OPENSSL_MODULES": "/home/vscode/.conan2/p/opens6abe2366a2bde/p/lib/ossl-modules"
+            }
+        }
+    ]
+}
